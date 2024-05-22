@@ -4,19 +4,13 @@ from torch import nn
 import torch.nn.functional as F
 import json
 
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 LR = 0.01  # learning rate
-EPSILON_INIT = 1
-EPSILON = EPSILON_INIT  # 0.99            # greedy policy
-GAMMA = 0.9  # reward discount
-TARGET_REPLACE_ITER = 100  # target DQN update frequency
-MEMORY_CAPACITY = 2000  # size of the replay buffer
+GAMMA = 0.99  # reward discount
+TARGET_REPLACE_ITER = 500  # target DQN update frequency
+MEMORY_CAPACITY = 8_000  # size of the replay buffer
 
-ENV_A_SHAPE = (2,)
-# ENV_A_SHAPE = 0 if isinstance(env.action_space.sample(), int) else env.action_space.sample().shape
-print(torch.cuda.is_available())
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(device)
 
 
 # class which defines the structure of the neural network of the DQN. Note that the input is the state, and the output a set of Q values, one for each action
@@ -121,8 +115,8 @@ class DQN(object):
             "n_actions": self.n_actions,
             "learn_step_counter": self.learn_step_counter,
             "memory_counter": self.memory_counter,
-            "memory": self.memory.tolist(),
         }
+        np.save(f"{path}/memory.npy", self.memory)
         with open(path + "/params.json", "w") as outfile:
             json.dump(d, outfile)
 
@@ -137,7 +131,8 @@ class DQN(object):
         self.n_actions = d["n_actions"]
         self.learn_step_counter = d["learn_step_counter"]
         self.memory_counter = d["memory_counter"]
-        self.memory = np.array(d["memory"])
+
+        self.memory = np.load(f"{path}/memory.npy")
 
         self.eval_net = torch.load(
             path + "/eval_net.pt", map_location=torch.device("cpu")
