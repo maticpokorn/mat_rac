@@ -2,7 +2,7 @@ import arcade
 from typing import Optional
 import numpy as np
 from numpy import random
-from queue import Queue
+import math
 import dqn
 from time import sleep
 from random import randint
@@ -58,6 +58,43 @@ ACTION_SPACE_SIZE = 16
 PLAYER_MEMORY = 50
 STATE_SPACE_SIZE = PLAYER_MEMORY * 10 * 2
 EPSILON_REDUCE = 0.9
+
+
+class Carrot:
+    def __init__(self):
+        self.sprite = arcade.Sprite("images/carrot.png", CHARACTER_SCALING)
+        self.sprite.center_x = SCREEN_WIDTH / 2
+        self.sprite.center_y = SCREEN_HEIGHT * (3 / 4) + 10
+        self.bottom = SCREEN_HEIGHT * (3 / 4) + 40
+        self.top = SCREEN_HEIGHT * (3 / 4) + 50
+        self.count = 0
+        self.pos = (
+            lambda count: 0.5 * (math.sin(count / 20) + 1) * (self.top - self.bottom)
+            + self.bottom
+        )
+        self.cooldown = 1000
+
+    def try_eat(self, player):
+        x1 = player.sprite.center_x
+        y1 = player.sprite.center_y
+        x2 = self.sprite.center_x
+        y2 = self.sprite.center_y
+        if (y2 - y1) ** 2 + (x2 - x1) ** 2 < 100:
+            player.attack_cooldown = 10
+            self.count = 0
+
+    def draw(self):
+        if self.count >= self.cooldown:
+            self.sprite.draw()
+
+    def on_update(self, player1, player2):
+        if self.count >= self.cooldown:
+            player1.attack_cooldown = PLAYER_ATTACK_COOLDOWN
+            player2.attack_cooldown = PLAYER_ATTACK_COOLDOWN
+        self.sprite.center_y = self.pos(self.count)
+        self.try_eat(player1)
+        self.try_eat(player2)
+        self.count += 1
 
 
 class Player:
@@ -641,10 +678,35 @@ class GameView(arcade.View):
             self.wall_list.append(wall)
             self.scene.add_sprite("Walls", wall)
 
+        # middle platform
         for x in range(200, SCREEN_WIDTH - 200, 25):
             wall = arcade.Sprite(grass, GRASS_SCALING)
             wall.center_x = x
             wall.center_y = SCREEN_HEIGHT / 5
+            self.wall_list.append(wall)
+            self.scene.add_sprite("Walls", wall)
+
+        # left platform
+        for x in range(0, 200, 25):
+            wall = arcade.Sprite(grass, GRASS_SCALING)
+            wall.center_x = x
+            wall.center_y = SCREEN_HEIGHT / 2
+            self.wall_list.append(wall)
+            self.scene.add_sprite("Walls", wall)
+
+        # left platform
+        for x in range(SCREEN_WIDTH - 200, SCREEN_WIDTH, 25):
+            wall = arcade.Sprite(grass, GRASS_SCALING)
+            wall.center_x = x
+            wall.center_y = SCREEN_HEIGHT / 2
+            self.wall_list.append(wall)
+            self.scene.add_sprite("Walls", wall)
+
+        # upper platform
+        for x in range(400, SCREEN_WIDTH - 400, 25):
+            wall = arcade.Sprite(grass, GRASS_SCALING)
+            wall.center_x = x
+            wall.center_y = SCREEN_HEIGHT - SCREEN_HEIGHT / 4
             self.wall_list.append(wall)
             self.scene.add_sprite("Walls", wall)
 
@@ -660,6 +722,9 @@ class GameView(arcade.View):
             wall.center_y = y
             self.wall_list.append(wall)
             self.scene.add_sprite("Walls", wall)
+
+        self.carrot = Carrot()
+        self.scene.add_sprite("Carrot", self.carrot.sprite)
 
         self.physics_engine = arcade.PymunkPhysicsEngine(
             gravity=(0, -GRAVITY), damping=1.0, maximum_incline_on_ground=0.708
@@ -682,6 +747,10 @@ class GameView(arcade.View):
             max_horizontal_velocity=PLAYER_MAX_HORIZONTAL_SPEED,
             max_vertical_velocity=PLAYER_MAX_VERTICAL_SPEED,
         )
+        """self.physics_engine.add_sprite(
+            self.carrot.sprite,
+            body_type=arcade.PymunkPhysicsEngine.STATIC,
+        )"""
 
         self.physics_engine.add_sprite_list(
             self.wall_list,
@@ -734,6 +803,7 @@ class GameView(arcade.View):
         self.player1.on_update(self.physics_engine, opponent=self.player2)
         # self.player2.set_movements_randomly()
         self.player2.on_update(self.physics_engine, opponent=self.player1)
+        self.carrot.on_update(self.player1, self.player2)
         self.physics_engine.step()
         if (
             self.player1.score <= 0
@@ -756,6 +826,7 @@ class GameView(arcade.View):
         # self.bullet_list.draw()
         # self.item_list.draw()
         self.player_list.draw()
+        self.carrot.draw()
         self.player1.bullet_list.draw()
         self.player2.bullet_list.draw()
 
